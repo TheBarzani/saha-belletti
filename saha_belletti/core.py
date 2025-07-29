@@ -73,7 +73,7 @@ def generate_circuit(graph, colors, oracle_type='balanced', grover_iterations=-1
         raise ValueError(f"Unknown oracle type: {oracle_type}")
     
     data = {}
-    method = oracle_map[oracle_type]()
+    method = oracle_map[oracle_type] 
     return make_circuit(graph, colors, method, data, grover_iterations)
 
 
@@ -110,9 +110,8 @@ def analyze_results(results, graph, colors):
     # For now, return a placeholder
     return {"placeholder": "analysis_results"}
 
-
-
-def make_circuit(graph, color_number, method, data, grover_iterations=-1):
+# Use this function when passing config.ini file
+def make_circuit_conf(graph, color_number, method, data, grover_iterations=-1):
     """
     Constructs a quantum circuit for the K-coloring problem using Grover's algorithm.
     
@@ -202,6 +201,95 @@ def make_circuit(graph, color_number, method, data, grover_iterations=-1):
 
     return qc
 
+def make_circuit(graph, color_number, method, data, grover_iterations=-1):
+    """
+    Constructs a quantum circuit for the K-coloring problem using Grover's algorithm.
+    
+    This function is the core of the quantum circuit generation process. It creates
+    a quantum circuit that can solve the graph K-coloring problem using one of the
+    implemented oracle methods (minimum depth, minimum width, balanced, or original).
+    
+    Args:
+        graph: NetworkX graph object representing the graph to be colored
+        color_number: Number of colors (k) available for coloring
+        method: Tuple containing (qubit_count_func, init_func, compose_func) 
+                for the chosen oracle implementation
+        data: Dictionary to store circuit metadata and results
+        grover_iterations: Number of Grover iterations to perform (-1 for optimal)
+    
+    Returns:
+        QuantumCircuit: The constructed quantum circuit ready for execution
+    """
+    # Extract the three functions from the method tuple
+    qubit_count, init, compose = method
+
+    # Graph parameters
+    n = graph.order()  # Number of nodes in the graph
+    k = color_number   # Number of available colors
+    qn = ceil(log2(k))  # Number of qubits needed per node to represent k colors
+
+    # Calculate optimal Grover iterations if not specified
+    if grover_iterations == -1:
+        # Total number of possible colorings (all combinations)
+        all_colorings = 2 ** (qn * n)  # Use n instead of len(conf["graph"])
+        # Number of valid colorings (solutions to the problem)
+        correct_colors = len(cpu_color_graph(graph, k))  # Use graph and k directly
+
+        # Grover's optimal iteration formula: π/4 * sqrt(N/M)
+        # where N is total search space and M is number of solutions
+        grover_iterations = floor(pi/4 * sqrt(all_colorings / correct_colors))
+    
+    # Store the calculated iterations in data for analysis
+    data["grover_iterations"] = grover_iterations
+    print("Grover iterations:", grover_iterations)
+    # inv_col = 2 ** qn - k  # Number of invalid colors (commented out)
+
+    def node_qubits(i):
+        """Returns the list of qubit indices assigned to node i"""
+        return list(range(qn*i, qn*(i+1)))
+
+    # Create the problem representation
+    problem = make_problem(graph, k)
+
+    # Calculate total number of qubits needed (depends on oracle implementation)
+    num_qubits = qubit_count(problem)
+
+    # Create the quantum circuit with quantum and classical registers
+    qc = QuantumCircuit(QuantumRegister(num_qubits),
+                        ClassicalRegister(n * qn, name="creg"))
+
+    # Initialize superposition state on all node qubits
+    # This creates an equal superposition of all possible colorings
+    for i in range(qn*n):
+        qc.h(i)  # Hadamard gate creates superposition
+
+    # Initialize the ancilla qubit for phase kickback in Grover's algorithm
+    qc.x(num_qubits - 1)  # Set ancilla to |1⟩
+    qc.h(num_qubits - 1)  # Put ancilla in |−⟩ state for phase kickback
+
+    # Initialize oracle-specific ancilla qubits
+    init(qc, problem)
+
+    # Grover iteration loop
+    for i_grv in range(grover_iterations):
+        # Create fresh problem instance for each iteration (clears history)
+        problem = make_problem(graph, k)  # new history
+        
+        # Apply the oracle (marks invalid colorings)
+        qv = compose(qc, problem)  # Get list of oracle output qubits
+        qc.mcx(qv, num_qubits - 1)  # Multi-controlled X gate for phase kickback
+        
+        # Undo oracle computation (uncompute)
+        decompose(problem)
+        
+        # Apply diffusion operator (amplitude amplification)
+        diffusion(qc, problem)
+
+    # Measure all node qubits to read out the final coloring
+    for i in range(qn*n):
+        qc.measure(i, i)
+
+    return qc
 
 def cpu_color_graph(graph, k, node=0, coloring=[]):
     """
