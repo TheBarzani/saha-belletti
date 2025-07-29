@@ -1,8 +1,14 @@
+# ===================================================================
+# Visualization Module - Statistical Analysis and Plotting
+# Part of the research paper: "Analyzing, Fixing and Optimizing a 
+# Space-Efficient Quantum Circuit for the Graph K-Coloring Problem"
+# ===================================================================
+
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as stats
 
-# Data provided by the user, with model names updated
+# Example data structure showing expected format (commented out):
 # data = {
 #     'ibm_osaka': {
 #         'Minimum Depth': [0.5947265625, 0.5693359375, 0.5693359375, 0.5791015625, 0.5966796875],
@@ -32,69 +38,105 @@ import scipy.stats as stats
 
 
 def plot_simulation_data(data, random_guess_chance):
-    # Convert values from 0 to 1 scale to 0 to 100 scale
+    """
+    Creates a comprehensive bar chart comparing oracle performance across noise models.
+    
+    This function generates publication-quality plots showing the performance of
+    different oracle implementations under various IBM quantum device noise models.
+    The plot includes confidence intervals and comparison with random guessing baseline.
+    
+    Args:
+        data: Nested dictionary of experimental results
+              Format: {noise_model: {system: [correct_chance_values]}}
+        random_guess_chance: Theoretical probability of random correct guess (baseline)
+    """
+    # Convert probability values from 0-1 scale to 0-100 percentage scale
     for model in data:
         for configuration in data[model]:
             data[model][configuration] = [x * 100 for x in
                                           data[model][configuration]]
 
+    # Set global font size for publication quality
     plt.rcParams.update({'font.size': 20})
 
-
     # Configuration for histogram plot
-    labels = list(data.keys())  # Noise model names
-    model_names = list(data[labels[0]].keys())  # Model names
-    x = np.arange(len(labels))  # Label locations
-    width = 0.2  # Width of the bars
-    # Diverse colors for each model
+    labels = list(data.keys())  # Noise model names (IBM backends)
+    model_names = list(data[labels[0]].keys())  # Oracle implementation names
+    x = np.arange(len(labels))  # X-axis positions for noise model groups
+    width = 0.2  # Width of individual bars
+    
+    # Color scheme for different oracle implementations
     colors = ['skyblue', 'lightgreen', 'salmon', 'violet']
 
+    # Map internal system names to formal publication names
     formal_name = {"simple": "Minimum depth oracle",
-                   "balanced": "Balanced oracle",
+                   "balanced": "Balanced oracle", 
                    "original": "Original paper oracle",
                    "minimal": "Minimum width oracle"}
 
-    # Function to calculate mean and 95% confidence interval
     def mean_confidence_interval(data, confidence=0.95):
+        """
+        Calculates mean and 95% confidence interval for a dataset.
+        
+        Uses t-distribution for small sample sizes, which is more appropriate
+        than normal distribution for typical experimental datasets.
+        
+        Args:
+            data: List of numerical values
+            confidence: Confidence level (default 95%)
+            
+        Returns:
+            Tuple of (mean, lower_bound, upper_bound)
+        """
         a = 1.0 * np.array(data)
         n = len(a)
-        m, se = np.mean(a), stats.sem(a)
+        m, se = np.mean(a), stats.sem(a)  # Mean and standard error
+        # Calculate margin of error using t-distribution
         h = se * stats.t.ppf((1 + confidence) / 2., n-1)
         return m, m-h, m+h
 
+    # Create the main figure and axis
     fig, ax = plt.subplots(figsize=(12, 8))
-    max_value = 0
+    max_value = 0  # Track maximum value for y-axis scaling
+    
+    # Plot bars for each oracle implementation
     for i, model_name in enumerate(model_names):
-        means = []
-        cis = []
+        means = []      # Mean performance for each noise model
+        cis = []        # Confidence intervals for each noise model
+        
+        # Calculate statistics for each noise model
         for label in labels:
             mean, ci_low, ci_high = mean_confidence_interval(data[label][model_name])
             means.append(mean)
+            # Store error bar data (distance from mean to bounds)
             cis.append((mean-ci_low, ci_high-mean))
-            max_value = max(max_value, mean + ci_high)  # Find max value to set yticks
-
-        # Plotting the bars for each model
-        cis = np.array(cis).T
-        ax.bar(x + i*width, means, width, label=formal_name[model_name], yerr=cis,
-               capsize=5, color=colors[i])
-    # Customize x-axis
-    ax.set_xticks(x + width*(len(model_names)-1)/2)
+            max_value = max(max_value, ci_high)  # Update maximum for y-axis
+        
+        # Plot bars with error bars for this oracle implementation
+        cis = np.array(cis).T  # Transpose for matplotlib error bar format
+        ax.bar(x + i*width, means, width, 
+               label=formal_name[model_name], 
+               yerr=cis, capsize=5, color=colors[i])
+    
+    # Customize x-axis labels and positions
+    ax.set_xticks(x + width*(len(model_names)-1)/2)  # Center group labels
     ax.set_xticklabels(labels)
-
-    # Adding labels and titles
+    
+    # Add axis labels and legend
     ax.set_xlabel('Noise Models')
     ax.set_ylabel('Correct Result Probability (%)')
     ax.legend(title="Model")
-
-    # Add a horizontal line for random correct guess probability
+    
+    # Add horizontal line for random guessing baseline
     ax.axhline(y=random_guess_chance * 100, color='r', linestyle='--',
                label='Random Correct Guess Probability (' +
                str(random_guess_chance * 100) + '%)')
-    ax.legend()
-
-    # Set y-ticks dynamically based on the data
-    ytick_spacing = 5  # Adjust this as needed for finer granularity
+    ax.legend()  # Refresh legend to include baseline
+    
+    # Set y-axis ticks for clear readability
+    ytick_spacing = 5  # 5% increments
     ax.set_yticks(np.arange(0, 100 + ytick_spacing, step=ytick_spacing))
-
+    
+    # Display and clean up
     plt.show()
     plt.close()
