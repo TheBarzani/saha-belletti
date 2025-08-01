@@ -6,3 +6,23 @@ __pycache__/
 /*.pkl
 Analyzing_Fixing_and_Optimizing_a_Space-Efficient_Quantum_Circuit_for_the_Graph_K-Coloring_Problem.pdf
 Circuit_Design_for_K-coloring_Problem_and_its_Implementation_on_Near-term_Quantum_Devices.pdf
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
