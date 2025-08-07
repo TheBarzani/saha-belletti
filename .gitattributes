@@ -1,0 +1,2 @@
+# Exclude HTML files from language statistics
+*.qasm quantum-qasm-netlist
