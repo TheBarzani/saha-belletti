@@ -269,6 +269,7 @@ def make_circuit(graph, color_number, method, data, grover_iterations=-1):
 
     # Initialize oracle-specific ancilla qubits
     init(qc, problem)
+    qc.barrier()
 
     # Grover iteration loop
     for i_grv in range(grover_iterations):
@@ -283,9 +284,11 @@ def make_circuit(graph, color_number, method, data, grover_iterations=-1):
         decompose(problem)
         
         # Apply diffusion operator (amplitude amplification)
+        qc.barrier()
         diffusion(qc, problem)
 
     # Measure all node qubits to read out the final coloring
+    qc.barrier()
     for i in range(qn*n):
         qc.measure(i, i)
 

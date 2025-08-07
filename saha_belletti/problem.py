@@ -297,17 +297,26 @@ def make_components(qc, problem):
         - arcs[i] = list of edge constraints involving node i
         - colors[i] = list of invalid color constraints for node i
     """
-    # Initialize arc constraints organized by node
+    # Get the graph and create a mapping from node labels to indices
+    g = graph(problem)
+    node_list = list(g.nodes())
+    node_to_index = {node: idx for idx, node in enumerate(node_list)}
+    
+    # Initialize arc constraints organized by node index
     arcs = [[] for i in range(n(problem))]
     
     # Populate arc constraints (each edge appears in both incident nodes' lists)
-    for i, j in graph(problem).edges:
-        def c(x, i=i, j=j):
-            return comparator(qc, problem, i, j, x)
+    for i, j in g.edges:
+        # Convert node labels to indices
+        i_idx = node_to_index[i]
+        j_idx = node_to_index[j]
+        
+        def c(x, i_orig=i_idx, j_orig=j_idx):
+            return comparator(qc, problem, i_orig, j_orig, x)
         
         # Add constraint to both nodes' lists (with edge identifier)
-        arcs[i].append(((i, j), c))
-        arcs[j].append(((i, j), c))
+        arcs[i_idx].append(((i_idx, j_idx), c))
+        arcs[j_idx].append(((i_idx, j_idx), c))
 
     # Create invalid color constraints organized by node
     colors = [[((i,),  # Node identifier (tuple for consistency)
