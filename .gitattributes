@@ -1,2 +1,2 @@
-# Exclude HTML files from language statistics
-*.qasm quantum-qasm-netlist
+# Exclude QASM files from language statistics
+*.qasm linguist-vendored
